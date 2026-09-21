@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProHosts Panel - Kart Puan Sorgu</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:#0a0e17;color:#e6edf3;min-height:100vh;padding:20px}
+.container{max-width:520px;margin:0 auto}
+h1{text-align:center;font-size:24px;margin-bottom:6px;background:linear-gradient(90deg,#00ffa3,#00c8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{text-align:center;color:#7d8590;font-size:13px;margin-bottom:22px}
+.card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:20px}
+.card h2{font-size:15px;color:#00ffa3;margin-bottom:14px}
+label{display:block;font-size:12px;color:#7d8590;margin-bottom:6px;text-transform:uppercase}
+input,textarea{width:100%;background:#0a0e17;border:1px solid #1f2937;color:#e6edf3;padding:12px;border-radius:9px;font-size:14px;outline:none;font-family:monospace}
+input:focus,textarea:focus{border-color:#00ffa3}
+textarea{min-height:90px;resize:vertical}
+button{width:100%;background:linear-gradient(90deg,#00ffa3,#00c8ff);color:#0a0e17;border:none;padding:13px;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;margin-top:10px}
+button:active{opacity:.7}
+button.alt{background:#1f2937;color:#e6edf3}
+.out{margin-top:12px;background:#0a0e17;border:1px solid #1f2937;border-radius:9px;padding:12px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;min-height:60px}
+.ok{color:#00ffa3}.bad{color:#ff5566}.warn{color:#ffb020}
+.result-line{padding:8px 0;border-bottom:1px solid #1f2937}
+.result-line:last-child{border-bottom:none}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>ProHosts Panel</h1>
+<p class="sub">Otomatik Kart Puan Sorgu • API Key Gerekmez</p>
+<div class="card">
+<h2>Kart Sorgula</h2>
+<label>Tek Kart (PAN|AA|YY|CVV)</label>
+<input id="cc" placeholder="4506347044736359|11|28|000">
+<button onclick="checkOne()">SORGULA</button>
+<label style="margin-top:16px">Toplu Liste (her satıra bir kart)</label>
+<textarea id="bulk" placeholder="4506347044736359|11|28|000&#10;5509890039631105|12|29|246"></textarea>
+<button class="alt" onclick="checkBulk()">TOPLU SORGULA</button>
+<div id="out" class="out">Sonuç bekleniyor...</div>
+</div>
+</div>
+<script>
+async function checkOne(){
+  const c=document.getElementById('cc').value.trim();
+  const o=document.getElementById('out');
+  if(!c){o.className='out bad';o.textContent='Kart gir.';return;}
+  o.className='out';o.textContent='Sorgulanıyor...';
+  try{
+    const r=await fetch('/adv3?card='+encodeURIComponent(c));
+    const d=await r.json();
+    o.className='out '+(d.result==='approved'?'ok':d.result==='declined'?'bad':'warn');
+    o.textContent=d.cc+' -> '+d.result.toUpperCase()+' | '+d.raw;
+  }catch(e){o.className='out bad';o.textContent='Bağlantı hatası: '+e;}
+}
+async function checkBulk(){
+  const lines=document.getElementById('bulk').value.split('\n').map(x=>x.trim()).filter(x=>x);
+  const o=document.getElementById('out');
+  if(!lines.length){o.className='out bad';o.textContent='Liste boş.';return;}
+  o.className='out';o.textContent='0/'+lines.length+' sorgulanıyor...';
+  let ok=0,bad=0,err=0,html='';
+  for(let i=0;i<lines.length;i++){
+    try{
+      const r=await fetch('/adv3?card='+encodeURIComponent(lines[i]));
+      const d=await r.json();
+      const cls=d.result==='approved'?'ok':d.result==='declined'?'bad':'warn';
+      if(d.result==='approved')ok++;else if(d.result==='declined')bad++;else err++;
+      html+='<div class="result-line '+cls+'">'+d.cc+' -> '+d.result.toUpperCase()+(d.reward>0?' ('+d.reward+' TRY)':'')+'</div>';
+    }catch(e){
+      err++;html+='<div class="result-line bad">'+lines[i]+' -> ERROR</div>';
+    }
+    o.innerHTML=html;
+    o.scrollTop=o.scrollHeight;
+  }
+  o.innerHTML='<div style="margin-bottom:8px">Approved: '+ok+' | Declined: '+bad+' | Error: '+err+'</div>'+html;
+}
+</script>
+</body>
+</html>
